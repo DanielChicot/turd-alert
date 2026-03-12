@@ -42,6 +42,7 @@ fun App(locationProvider: LocationProvider) {
 
     val uiState by viewModel.state.collectAsState()
     val selectedOverflow by viewModel.selectedOverflow.collectAsState()
+    val hasUserInteracted by viewModel.hasUserInteracted.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.refresh()
@@ -59,7 +60,8 @@ fun App(locationProvider: LocationProvider) {
             }
 
             is OverflowViewModel.UiState.Loaded -> {
-                val bounds = cameraBounds(state.overflows, state.location)
+                val bounds = if (hasUserInteracted) null
+                    else cameraBounds(state.overflows, state.location)
 
                 Box(modifier = Modifier.fillMaxSize()) {
                     MapView(
@@ -68,6 +70,7 @@ fun App(locationProvider: LocationProvider) {
                         bounds = bounds,
                         onMarkerClick = { viewModel.selectOverflow(it) },
                         onMapClick = { viewModel.clearSelection() },
+                        onViewportChanged = { viewModel.onViewportChanged(it) },
                         modifier = Modifier.fillMaxSize()
                     )
 
