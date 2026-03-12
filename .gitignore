@@ -2,3 +2,24 @@
 # Dolt database files (added by bd init)
 .dolt/
 *.db
+
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Kotlin
+*.class
+
+# Android
+local.properties
+
+# iOS
+iosApp/iosApp.xcodeproj/
+iosApp/iosApp.xcworkspace/
+iosApp/Pods/
