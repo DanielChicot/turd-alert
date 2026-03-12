@@ -59,6 +59,7 @@ private class MapDelegate(
             view.annotation = viewForAnnotation
             view.pinTintColor = when (viewForAnnotation.overflow.status) {
                 DischargeStatus.DISCHARGING -> platform.UIKit.UIColor.redColor
+                DischargeStatus.RECENT_DISCHARGE -> platform.UIKit.UIColor.yellowColor
                 DischargeStatus.NOT_DISCHARGING -> platform.UIKit.UIColor.greenColor
                 DischargeStatus.OFFLINE -> platform.UIKit.UIColor.grayColor
             }

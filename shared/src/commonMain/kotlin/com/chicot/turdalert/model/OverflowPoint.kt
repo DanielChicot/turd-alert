@@ -16,6 +16,7 @@ data class OverflowPoint(
 
 enum class DischargeStatus {
     DISCHARGING,
+    RECENT_DISCHARGE,
     NOT_DISCHARGING,
     OFFLINE
 }

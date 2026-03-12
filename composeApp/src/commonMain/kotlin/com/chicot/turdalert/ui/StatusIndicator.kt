@@ -12,11 +12,13 @@ import androidx.compose.ui.unit.dp
 import com.chicot.turdalert.model.DischargeStatus
 
 private val dischargingRed = Color(0xFFFF1744)
+private val recentDischargeYellow = Color(0xFFFFD600)
 private val notDischargingGreen = Color(0xFF00C853)
 private val offlineGrey = Color(0xFF9E9E9E)
 
 fun DischargeStatus.indicatorColor(): Color = when (this) {
     DischargeStatus.DISCHARGING -> dischargingRed
+    DischargeStatus.RECENT_DISCHARGE -> recentDischargeYellow
     DischargeStatus.NOT_DISCHARGING -> notDischargingGreen
     DischargeStatus.OFFLINE -> offlineGrey
 }

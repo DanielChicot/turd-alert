@@ -3,6 +3,7 @@ package com.chicot.turdalert.viewmodel
 import com.chicot.turdalert.api.OverflowRepository
 import com.chicot.turdalert.domain.DebouncedFetcher
 import com.chicot.turdalert.domain.nearbyOverflows
+import com.chicot.turdalert.domain.withRecentDischargeStatus
 import com.chicot.turdalert.location.Coordinates
 import com.chicot.turdalert.location.LocationProvider
 import com.chicot.turdalert.model.BoundingBox
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
 
 class OverflowViewModel(
     private val repository: OverflowRepository,
@@ -59,7 +61,7 @@ class OverflowViewModel(
                         else -> locationProvider.currentLocation() ?: return@collect
                     }
                     _state.value = UiState.Loaded(
-                        overflows = results,
+                        overflows = results.withRecentDischargeStatus(Clock.System.now().toEpochMilliseconds()),
                         location = location
                     )
                 }
@@ -109,7 +111,7 @@ class OverflowViewModel(
                 }
 
                 _state.value = UiState.Loaded(
-                    overflows = overflows,
+                    overflows = overflows.withRecentDischargeStatus(Clock.System.now().toEpochMilliseconds()),
                     location = location
                 )
                 initialLoadComplete = true
