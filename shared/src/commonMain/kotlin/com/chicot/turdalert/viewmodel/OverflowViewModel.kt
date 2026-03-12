@@ -44,6 +44,7 @@ class OverflowViewModel(
 
     private var currentViewportBounds: BoundingBox? = null
     private var initialLoadComplete = false
+    private val overflowCache = mutableMapOf<String, OverflowPoint>()
 
     private val debouncedFetcher = DebouncedFetcher(
         scope = scope
@@ -60,8 +61,10 @@ class OverflowViewModel(
                         is UiState.Loaded -> currentState.location
                         else -> locationProvider.currentLocation() ?: return@collect
                     }
+                    results.forEach { overflowCache[it.id] = it }
                     _state.value = UiState.Loaded(
-                        overflows = results.withRecentDischargeStatus(Clock.System.now().toEpochMilliseconds()),
+                        overflows = overflowCache.values.toList()
+                            .withRecentDischargeStatus(Clock.System.now().toEpochMilliseconds()),
                         location = location
                     )
                 }
@@ -110,6 +113,8 @@ class OverflowViewModel(
                     allOverflows.nearbyOverflows(location)
                 }
 
+                overflowCache.clear()
+                overflows.forEach { overflowCache[it.id] = it }
                 _state.value = UiState.Loaded(
                     overflows = overflows.withRecentDischargeStatus(Clock.System.now().toEpochMilliseconds()),
                     location = location
