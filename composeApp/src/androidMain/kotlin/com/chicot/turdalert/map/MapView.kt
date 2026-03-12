@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.filter
 
 private fun DischargeStatus.markerHue(): Float = when (this) {
     DischargeStatus.DISCHARGING -> BitmapDescriptorFactory.HUE_RED
+    DischargeStatus.RECENT_DISCHARGE -> BitmapDescriptorFactory.HUE_YELLOW
     DischargeStatus.NOT_DISCHARGING -> BitmapDescriptorFactory.HUE_GREEN
     DischargeStatus.OFFLINE -> BitmapDescriptorFactory.HUE_VIOLET
 }
