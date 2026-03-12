@@ -1295,3 +1295,144 @@ Note: Set simulator location to a UK location via Features → Location → Cust
 - [ ] **Step 2: Verify same behaviour as Android test above**
 
 - [ ] **Step 3: Final commit if any fixes needed**
+
+---
+
+## Chunk 5: Yellow Pins for Recent Discharges
+
+### Task 11: Add yellow pin colour for recently-stopped discharges
+
+**Context:** `OverflowPoint.statusStart` is a Unix timestamp (milliseconds) indicating when the current status began. It is populated by the 8 ArcGIS companies but is `null` for Thames Water and Welsh Water. If a point's status is `NOT_DISCHARGING` and `statusStart` is non-null and within the last hour, the pin should be yellow — indicating it recently stopped discharging.
+
+**Files:**
+- Modify: `shared/src/commonMain/kotlin/com/chicot/turdalert/model/OverflowPoint.kt`
+- Modify: `composeApp/src/androidMain/kotlin/com/chicot/turdalert/map/MapView.kt`
+- Modify: `composeApp/src/iosMain/kotlin/com/chicot/turdalert/map/MapView.kt`
+- Modify: `composeApp/src/commonMain/kotlin/com/chicot/turdalert/ui/OverflowInfoCard.kt` (status dot colour)
+
+- [ ] **Step 1: Add RECENT_DISCHARGE status to DischargeStatus**
+
+In `shared/src/commonMain/kotlin/com/chicot/turdalert/model/OverflowPoint.kt`, add a new enum value:
+
+```kotlin
+enum class DischargeStatus {
+    DISCHARGING,
+    RECENT_DISCHARGE,
+    NOT_DISCHARGING,
+    OFFLINE
+}
+```
+
+- [ ] **Step 2: Add a function to enrich status based on statusStart**
+
+Add a new file `shared/src/commonMain/kotlin/com/chicot/turdalert/domain/RecentDischarge.kt`:
+
+```kotlin
+package com.chicot.turdalert.domain
+
+import com.chicot.turdalert.model.DischargeStatus
+import com.chicot.turdalert.model.OverflowPoint
+
+private const val ONE_HOUR_MS = 3_600_000L
+
+fun List<OverflowPoint>.withRecentDischargeStatus(
+    nowMillis: Long
+): List<OverflowPoint> = map { point ->
+    if (point.status == DischargeStatus.NOT_DISCHARGING &&
+        point.statusStart != null &&
+        (nowMillis - point.statusStart) <= ONE_HOUR_MS
+    ) {
+        point.copy(status = DischargeStatus.RECENT_DISCHARGE)
+    } else {
+        point
+    }
+}
+```
+
+- [ ] **Step 3: Apply enrichment in OverflowViewModel**
+
+In `shared/src/commonMain/kotlin/com/chicot/turdalert/viewmodel/OverflowViewModel.kt`, add the import:
+
+```kotlin
+import com.chicot.turdalert.domain.withRecentDischargeStatus
+import kotlinx.datetime.Clock
+```
+
+In the `init` block where debounced results are collected, apply the enrichment before setting state:
+
+```kotlin
+_state.value = UiState.Loaded(
+    overflows = results.withRecentDischargeStatus(Clock.System.now().toEpochMilliseconds()),
+    location = location
+)
+```
+
+And in `refresh()`, apply it to the result before setting state:
+
+```kotlin
+_state.value = UiState.Loaded(
+    overflows = overflows.withRecentDischargeStatus(Clock.System.now().toEpochMilliseconds()),
+    location = location
+)
+```
+
+- [ ] **Step 4: Update Android pin colour**
+
+In `composeApp/src/androidMain/kotlin/com/chicot/turdalert/map/MapView.kt`, update the `markerHue()` extension:
+
+```kotlin
+private fun DischargeStatus.markerHue(): Float = when (this) {
+    DischargeStatus.DISCHARGING -> BitmapDescriptorFactory.HUE_RED
+    DischargeStatus.RECENT_DISCHARGE -> BitmapDescriptorFactory.HUE_YELLOW
+    DischargeStatus.NOT_DISCHARGING -> BitmapDescriptorFactory.HUE_GREEN
+    DischargeStatus.OFFLINE -> BitmapDescriptorFactory.HUE_VIOLET
+}
+```
+
+- [ ] **Step 5: Update iOS pin colour**
+
+In `composeApp/src/iosMain/kotlin/com/chicot/turdalert/map/MapView.kt`, update the `pinTintColor` assignment in `viewForAnnotation`:
+
+```kotlin
+view.pinTintColor = when (viewForAnnotation.overflow.status) {
+    DischargeStatus.DISCHARGING -> platform.UIKit.UIColor.redColor
+    DischargeStatus.RECENT_DISCHARGE -> platform.UIKit.UIColor.yellowColor
+    DischargeStatus.NOT_DISCHARGING -> platform.UIKit.UIColor.greenColor
+    DischargeStatus.OFFLINE -> platform.UIKit.UIColor.grayColor
+}
+```
+
+- [ ] **Step 6: Update status dot in OverflowInfoCard**
+
+In `composeApp/src/commonMain/kotlin/com/chicot/turdalert/ui/OverflowInfoCard.kt`, find the status dot colour mapping and add the yellow case:
+
+```kotlin
+DischargeStatus.RECENT_DISCHARGE -> Color(0xFFFFD600)
+```
+
+This is a bright yellow that works on both light and dark backgrounds.
+
+- [ ] **Step 7: Build and verify**
+
+Run: `./gradlew :composeApp:assembleDebug 2>&1 | tail -5`
+Expected: BUILD SUCCESSFUL
+
+Run: `./gradlew :composeApp:iosSimulatorArm64MainBinaries 2>&1 | tail -5`
+Expected: BUILD SUCCESSFUL
+
+Run: `./gradlew :shared:allTests 2>&1 | tail -10`
+Expected: All tests PASS.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add shared/src/commonMain/kotlin/com/chicot/turdalert/model/OverflowPoint.kt \
+       shared/src/commonMain/kotlin/com/chicot/turdalert/domain/RecentDischarge.kt \
+       shared/src/commonMain/kotlin/com/chicot/turdalert/viewmodel/OverflowViewModel.kt \
+       composeApp/src/androidMain/kotlin/com/chicot/turdalert/map/MapView.kt \
+       composeApp/src/iosMain/kotlin/com/chicot/turdalert/map/MapView.kt \
+       composeApp/src/commonMain/kotlin/com/chicot/turdalert/ui/OverflowInfoCard.kt
+git commit -m "Add yellow pin for overflows that stopped discharging within the last hour"
+```
+
+**Note:** Points from Thames Water and Welsh Water will never show yellow because their `statusStart` is always `null`. This is a data limitation of those APIs, not a bug.
