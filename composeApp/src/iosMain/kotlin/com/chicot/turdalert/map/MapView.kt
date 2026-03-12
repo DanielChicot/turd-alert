@@ -38,7 +38,8 @@ private class OverflowAnnotation(
 
 private class MapDelegate(
     private val onMarkerClick: (OverflowPoint) -> Unit,
-    private val onMapClick: () -> Unit
+    private val onMapClick: () -> Unit,
+    private val onViewportChanged: (BoundingBox) -> Unit
 ) : NSObject(), MKMapViewDelegateProtocol {
 
     @ObjCAction
@@ -73,6 +74,21 @@ private class MapDelegate(
         }
         mapView.deselectAnnotation(annotation, animated = false)
     }
+
+    @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
+    override fun mapView(mapView: MKMapView, regionDidChangeAnimated: Boolean) {
+        val region = mapView.region
+        val center = region.center
+        val span = region.span
+        onViewportChanged(
+            BoundingBox(
+                minLat = center.latitude - span.latitudeDelta / 2.0,
+                maxLat = center.latitude + span.latitudeDelta / 2.0,
+                minLon = center.longitude - span.longitudeDelta / 2.0,
+                maxLon = center.longitude + span.longitudeDelta / 2.0
+            )
+        )
+    }
 }
 
 @OptIn(ExperimentalForeignApi::class, ExperimentalComposeUiApi::class)
@@ -80,13 +96,14 @@ private class MapDelegate(
 actual fun MapView(
     overflows: List<OverflowPoint>,
     userLocation: Coordinates,
-    bounds: BoundingBox,
+    bounds: BoundingBox?,
     onMarkerClick: (OverflowPoint) -> Unit,
     onMapClick: () -> Unit,
+    onViewportChanged: (BoundingBox) -> Unit,
     modifier: Modifier
 ) {
-    val delegate = remember(onMarkerClick, onMapClick) {
-        MapDelegate(onMarkerClick, onMapClick)
+    val delegate = remember(onMarkerClick, onMapClick, onViewportChanged) {
+        MapDelegate(onMarkerClick, onMapClick, onViewportChanged)
     }
 
     UIKitView(
@@ -108,15 +125,17 @@ actual fun MapView(
                 mapView.addAnnotation(OverflowAnnotation(overflow))
             }
 
-            val centerLat = (bounds.minLat + bounds.maxLat) / 2.0
-            val centerLon = (bounds.minLon + bounds.maxLon) / 2.0
-            val spanLat = (bounds.maxLat - bounds.minLat) * 1.2
-            val spanLon = (bounds.maxLon - bounds.minLon) * 1.2
-            val region = MKCoordinateRegionMake(
-                CLLocationCoordinate2DMake(centerLat, centerLon),
-                MKCoordinateSpanMake(spanLat, spanLon)
-            )
-            mapView.setRegion(region, animated = true)
+            if (bounds != null) {
+                val centerLat = (bounds.minLat + bounds.maxLat) / 2.0
+                val centerLon = (bounds.minLon + bounds.maxLon) / 2.0
+                val spanLat = (bounds.maxLat - bounds.minLat) * 1.2
+                val spanLon = (bounds.maxLon - bounds.minLon) * 1.2
+                val region = MKCoordinateRegionMake(
+                    CLLocationCoordinate2DMake(centerLat, centerLon),
+                    MKCoordinateSpanMake(spanLat, spanLon)
+                )
+                mapView.setRegion(region, animated = true)
+            }
         },
         properties = UIKitInteropProperties(
             interactionMode = UIKitInteropInteractionMode.NonCooperative
