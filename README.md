@@ -176,3 +176,58 @@ The app displays a full-screen interactive map (Google Maps on Android, MapKit o
 - **Thames Water service area gate**: Thames Water lacks server-side spatial queries, so the app skips the API entirely when the user is outside lat 51.0–52.2 / lon -2.2–0.6
 - **Per-company error isolation**: Each company is fetched in a separate coroutine; failures return an empty list rather than crashing the whole refresh
 - **iOS main thread requirement**: `CLLocationManager` must be created and used on the main thread; the iOS location provider uses `dispatch_async(dispatch_get_main_queue())` and retains strong references to both the manager and delegate to prevent ARC deallocation
+
+## Issue tracking (beads)
+
+This project uses [beads](https://github.com/beads-ai/beads-cli) (`bd`) for issue tracking. Issues are stored in a Dolt database under `.beads/` and exported to `.beads/issues.jsonl` for git portability.
+
+### Setup
+
+```bash
+brew install beads-ai/tap/beads
+bd init
+```
+
+This creates the `.beads/` directory, starts a local Dolt server, and generates an `AGENTS.md` with workflow instructions for AI agents.
+
+### Dolt server
+
+Beads expects a Dolt SQL server on port 3307:
+
+```bash
+bd dolt start
+```
+
+### Syncing issues
+
+Issues are synced via the git repo itself (`.beads/issues.jsonl` is committed). To push/pull the Dolt database:
+
+```bash
+bd dolt push
+bd dolt pull
+```
+
+### Daily workflow
+
+```mermaid
+graph LR
+    A[bd ready] --> B[bd update ID --claim]
+    B --> C[implement & test]
+    C --> D[bd close ID]
+    D --> E[git commit & push]
+    E --> F[bd dolt push]
+```
+
+### Common commands
+
+| Command | Description |
+|---------|-------------|
+| `bd ready` | Show unblocked issues ready to work |
+| `bd create "title" -t feature -p 2` | Create an issue |
+| `bd update ID --claim` | Claim an issue |
+| `bd close ID` | Mark complete |
+| `bd list --status=open` | List open issues |
+| `bd show ID` | View issue details |
+| `bd dep add A B` | A depends on B |
+| `bd dolt push` | Push issues to remote |
+| `bd dolt pull` | Pull issues from remote |
