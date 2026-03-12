@@ -1,0 +1,8 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_server_port": 3307,
+  "dolt_database": "turd_alert",
+  "project_id": "5edeb2ce-4ee8-458b-ba98-57c91e44b3bf"
+}
