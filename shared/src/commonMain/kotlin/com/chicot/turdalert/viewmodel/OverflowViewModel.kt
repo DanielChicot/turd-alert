@@ -32,6 +32,17 @@ class OverflowViewModel(
     private val _state = MutableStateFlow<UiState>(UiState.Loading)
     val state: StateFlow<UiState> = _state.asStateFlow()
 
+    private val _selectedOverflow = MutableStateFlow<OverflowPoint?>(null)
+    val selectedOverflow: StateFlow<OverflowPoint?> = _selectedOverflow.asStateFlow()
+
+    fun selectOverflow(overflow: OverflowPoint) {
+        _selectedOverflow.value = overflow
+    }
+
+    fun clearSelection() {
+        _selectedOverflow.value = null
+    }
+
     fun refresh() {
         scope.launch {
             val currentState = _state.value
