@@ -1,7 +1,7 @@
 package com.chicot.turdalert.viewmodel
 
 import com.chicot.turdalert.api.OverflowRepository
-import com.chicot.turdalert.domain.withinRadius
+import com.chicot.turdalert.domain.nearbyOverflows
 import com.chicot.turdalert.location.Coordinates
 import com.chicot.turdalert.location.LocationProvider
 import com.chicot.turdalert.model.OverflowPoint
@@ -49,7 +49,7 @@ class OverflowViewModel(
                 }
 
                 val allOverflows = repository.allOverflows(location)
-                val nearby = allOverflows.withinRadius(location)
+                val nearby = allOverflows.nearbyOverflows(location)
                 _state.value = UiState.Loaded(
                     overflows = nearby,
                     location = location
