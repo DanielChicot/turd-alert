@@ -84,7 +84,12 @@ class OverflowViewModel(
         currentViewportBounds = bounds
         if (!initialLoadComplete) return
         _hasUserInteracted.value = true
+        if (bounds.maxLat - bounds.minLat > MAX_VIEWPORT_LAT_SPAN) return
         debouncedFetcher.onViewportChanged(bounds)
+    }
+
+    private companion object {
+        const val MAX_VIEWPORT_LAT_SPAN = 0.5
     }
 
     fun refresh() {

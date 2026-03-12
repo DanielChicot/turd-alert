@@ -8,6 +8,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
+import kotlinx.datetime.Clock
 
 private fun BoundingBox.toArcGisGeometry(): String =
     "$minLon,$minLat,$maxLon,$maxLat"
@@ -95,6 +96,7 @@ internal data object ThamesWaterApi : WaterCompanyApi {
 
     private const val BASE_URL = "https://api.thameswater.co.uk/opendata/v2/discharge/status"
     private const val PAGE_SIZE = 1000
+    private const val CACHE_TTL_MS = 600_000L
 
     private const val SERVICE_AREA_LAT_MIN = 51.0
     private const val SERVICE_AREA_LAT_MAX = 52.2
@@ -108,12 +110,32 @@ internal data object ThamesWaterApi : WaterCompanyApi {
         maxLon = SERVICE_AREA_LON_MAX
     )
 
+    private var cachedOverflows: List<OverflowPoint>? = null
+    private var cacheTimestampMs: Long = 0L
+
     private fun inServiceArea(bounds: BoundingBox): Boolean =
         bounds.overlaps(serviceArea)
 
     override suspend fun fetchOverflows(client: HttpClient, bounds: BoundingBox): List<OverflowPoint> {
         if (!inServiceArea(bounds)) return emptyList()
-        return paginate { offset ->
+        val allOverflows = validCache()
+            ?: fetchAll(client).also {
+                cachedOverflows = it
+                cacheTimestampMs = Clock.System.now().toEpochMilliseconds()
+            }
+        return allOverflows.filter { point ->
+            point.latitude in bounds.minLat..bounds.maxLat &&
+                point.longitude in bounds.minLon..bounds.maxLon
+        }
+    }
+
+    private fun validCache(): List<OverflowPoint>? =
+        cachedOverflows?.takeIf {
+            Clock.System.now().toEpochMilliseconds() - cacheTimestampMs < CACHE_TTL_MS
+        }
+
+    private suspend fun fetchAll(client: HttpClient): List<OverflowPoint> =
+        paginate { offset ->
             client.get(BASE_URL) {
                 parameter("limit", PAGE_SIZE)
                 parameter("offset", offset)
@@ -133,11 +155,7 @@ internal data object ThamesWaterApi : WaterCompanyApi {
                 statusStart = null,
                 company = companyName
             )
-        }.filter { point ->
-            point.latitude in bounds.minLat..bounds.maxLat &&
-                point.longitude in bounds.minLon..bounds.maxLon
         }
-    }
 
     private suspend fun paginate(fetch: suspend (Int) -> List<ThamesWaterItem>): List<ThamesWaterItem> {
         val results = mutableListOf<ThamesWaterItem>()
