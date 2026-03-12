@@ -13,6 +13,7 @@ import com.chicot.turdalert.model.DischargeStatus
 import com.chicot.turdalert.model.OverflowPoint
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCAction
+import kotlinx.cinterop.useContents
 import platform.CoreLocation.CLLocationCoordinate2DMake
 import platform.Foundation.NSSelectorFromString
 import platform.MapKit.MKAnnotationProtocol
@@ -75,19 +76,19 @@ private class MapDelegate(
         mapView.deselectAnnotation(annotation, animated = false)
     }
 
+    @OptIn(ExperimentalForeignApi::class)
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
     override fun mapView(mapView: MKMapView, regionDidChangeAnimated: Boolean) {
-        val region = mapView.region
-        val center = region.center
-        val span = region.span
-        onViewportChanged(
-            BoundingBox(
-                minLat = center.latitude - span.latitudeDelta / 2.0,
-                maxLat = center.latitude + span.latitudeDelta / 2.0,
-                minLon = center.longitude - span.longitudeDelta / 2.0,
-                maxLon = center.longitude + span.longitudeDelta / 2.0
+        mapView.region.useContents {
+            onViewportChanged(
+                BoundingBox(
+                    minLat = center.latitude - span.latitudeDelta / 2.0,
+                    maxLat = center.latitude + span.latitudeDelta / 2.0,
+                    minLon = center.longitude - span.longitudeDelta / 2.0,
+                    maxLon = center.longitude + span.longitudeDelta / 2.0
+                )
             )
-        )
+        }
     }
 }
 
