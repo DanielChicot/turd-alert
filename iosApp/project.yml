@@ -1,0 +1,23 @@
+name: iosApp
+options:
+  bundleIdPrefix: com.chicot.turdalert
+  deploymentTarget:
+    iOS: "16.0"
+
+settings:
+  FRAMEWORK_SEARCH_PATHS: "$(SRCROOT)/../composeApp/build/bin/iosSimulatorArm64/debugFramework"
+
+targets:
+  iosApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: iosApp
+    info:
+      path: iosApp/Info.plist
+      properties:
+        NSLocationWhenInUseUsageDescription: "Turd Alert needs your location to show nearby sewage overflow discharge points."
+        CFBundleDisplayName: "Turd Alert"
+    settings:
+      FRAMEWORK_SEARCH_PATHS: "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosSimulatorArm64/debugFramework"
+      OTHER_LINKER_FLAGS: "-framework ComposeApp"
