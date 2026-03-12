@@ -28,3 +28,4 @@ local.properties
 iosApp/iosApp.xcodeproj/
 iosApp/iosApp.xcworkspace/
 iosApp/Pods/
+.aider*
