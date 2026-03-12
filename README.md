@@ -10,9 +10,12 @@ Data is fetched directly from 10 UK water company public APIs — no backend req
 graph TD
     subgraph composeApp
         App[App.kt] --> VM[OverflowViewModel]
-        App --> UI[OverflowList / OverflowCard]
+        App --> MV[MapView]
+        App --> UI[OverflowInfoCard / SummaryChip / RefreshFAB]
         MA[MainActivity] -->|Android| App
         MVC[MainViewController] -->|iOS| App
+        MV -->|Android| GMV[Google Maps]
+        MV -->|iOS| MKV[MapKit]
     end
 
     subgraph shared
@@ -58,7 +61,8 @@ sequenceDiagram
     A-->>R: List<OverflowPoint>
     R-->>V: merged results
     V->>V: withinRadius(1 mile)
-    V-->>U: UiState.Loaded
+    V->>V: cameraBounds(overflows, location)
+    V-->>U: UiState.Loaded → MapView with markers
 ```
 
 ## Water companies
@@ -139,22 +143,27 @@ turd-alert/
 │       │       ├── api/             # HTTP clients, DTOs, coordinate conversion
 │       │       ├── domain/          # Proximity filtering
 │       │       ├── location/        # LocationProvider interface
-│       │       ├── model/           # OverflowPoint, DischargeStatus
+│       │       ├── map/             # Directions expect declaration
+│       │       ├── model/           # OverflowPoint, BoundingBox, DischargeStatus
 │       │       ├── util/            # Haversine distance
 │       │       └── viewmodel/       # OverflowViewModel, UiState
-│       ├── androidMain/             # Android LocationProvider (LocationManager)
-│       └── iosMain/                 # iOS LocationProvider (CLLocationManager)
+│       ├── androidMain/             # Android LocationProvider, Directions actual (Google Maps intent)
+│       └── iosMain/                 # iOS LocationProvider, Directions actual (Apple Maps URL)
 ├── composeApp/                      # Compose Multiplatform UI
 │   └── src/
-│       ├── commonMain/              # Shared UI (App, OverflowCard, OverflowList)
-│       ├── androidMain/             # MainActivity, adaptive icon
-│       └── iosMain/                 # MainViewController bridge
+│       ├── commonMain/              # Shared UI (App, MapView expect, OverflowInfoCard, SummaryChip, RefreshFAB)
+│       ├── androidMain/             # MainActivity, Google Maps MapView actual
+│       └── iosMain/                 # MainViewController, MapKit MapView actual
 └── iosApp/                          # iOS app shell (Swift/SwiftUI)
     ├── iosApp/                      # Swift sources + Info.plist
     └── project.yml                  # xcodegen spec
 ```
 
-## Status indicators
+## Map UI
+
+The app displays a full-screen interactive map (Google Maps on Android, MapKit on iOS) with coloured markers for each overflow point. Tapping a marker shows an info card with site name, status, duration, and a directions button. A summary chip at the bottom shows the count of discharging/total overflows.
+
+### Marker colours
 
 - **Red** — actively discharging sewage
 - **Green** — not discharging
