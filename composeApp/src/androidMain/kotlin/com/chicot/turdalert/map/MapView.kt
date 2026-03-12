@@ -2,6 +2,7 @@ package com.chicot.turdalert.map
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import com.chicot.turdalert.location.Coordinates
 import com.chicot.turdalert.model.BoundingBox
@@ -17,6 +18,8 @@ import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberMarkerState
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filter
 
 private fun DischargeStatus.markerHue(): Float = when (this) {
     DischargeStatus.DISCHARGING -> BitmapDescriptorFactory.HUE_RED
@@ -28,19 +31,40 @@ private fun DischargeStatus.markerHue(): Float = when (this) {
 actual fun MapView(
     overflows: List<OverflowPoint>,
     userLocation: Coordinates,
-    bounds: BoundingBox,
+    bounds: BoundingBox?,
     onMarkerClick: (OverflowPoint) -> Unit,
     onMapClick: () -> Unit,
+    onViewportChanged: (BoundingBox) -> Unit,
     modifier: Modifier
 ) {
     val cameraPositionState = rememberCameraPositionState()
 
     LaunchedEffect(bounds) {
-        val latLngBounds = LatLngBounds(
-            LatLng(bounds.minLat, bounds.minLon),
-            LatLng(bounds.maxLat, bounds.maxLon)
-        )
-        cameraPositionState.animate(CameraUpdateFactory.newLatLngBounds(latLngBounds, 64))
+        if (bounds != null) {
+            val latLngBounds = LatLngBounds(
+                LatLng(bounds.minLat, bounds.minLon),
+                LatLng(bounds.maxLat, bounds.maxLon)
+            )
+            cameraPositionState.animate(CameraUpdateFactory.newLatLngBounds(latLngBounds, 64))
+        }
+    }
+
+    LaunchedEffect(cameraPositionState) {
+        snapshotFlow { cameraPositionState.isMoving }
+            .filter { !it }
+            .collectLatest {
+                val projection = cameraPositionState.projection ?: return@collectLatest
+                val visibleRegion = projection.visibleRegion
+                val latLngBounds = visibleRegion.latLngBounds
+                onViewportChanged(
+                    BoundingBox(
+                        minLat = latLngBounds.southwest.latitude,
+                        maxLat = latLngBounds.northeast.latitude,
+                        minLon = latLngBounds.southwest.longitude,
+                        maxLon = latLngBounds.northeast.longitude
+                    )
+                )
+            }
     }
 
     GoogleMap(

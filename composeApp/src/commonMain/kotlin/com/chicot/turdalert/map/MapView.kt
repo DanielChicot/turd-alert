@@ -10,8 +10,9 @@ import com.chicot.turdalert.model.OverflowPoint
 expect fun MapView(
     overflows: List<OverflowPoint>,
     userLocation: Coordinates,
-    bounds: BoundingBox,
+    bounds: BoundingBox?,
     onMarkerClick: (OverflowPoint) -> Unit,
     onMapClick: () -> Unit,
+    onViewportChanged: (BoundingBox) -> Unit,
     modifier: Modifier = Modifier
 )
