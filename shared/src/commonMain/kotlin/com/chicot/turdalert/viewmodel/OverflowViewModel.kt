@@ -1,15 +1,17 @@
 package com.chicot.turdalert.viewmodel
 
 import com.chicot.turdalert.api.OverflowRepository
+import com.chicot.turdalert.domain.DebouncedFetcher
 import com.chicot.turdalert.domain.nearbyOverflows
 import com.chicot.turdalert.location.Coordinates
 import com.chicot.turdalert.location.LocationProvider
+import com.chicot.turdalert.model.BoundingBox
 import com.chicot.turdalert.model.OverflowPoint
+import com.chicot.turdalert.model.toBoundingBox
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class OverflowViewModel(
@@ -35,6 +37,36 @@ class OverflowViewModel(
     private val _selectedOverflow = MutableStateFlow<OverflowPoint?>(null)
     val selectedOverflow: StateFlow<OverflowPoint?> = _selectedOverflow.asStateFlow()
 
+    private val _hasUserInteracted = MutableStateFlow(false)
+    val hasUserInteracted: StateFlow<Boolean> = _hasUserInteracted.asStateFlow()
+
+    private var currentViewportBounds: BoundingBox? = null
+    private var initialLoadComplete = false
+
+    private val debouncedFetcher = DebouncedFetcher(
+        scope = scope
+    ) { bounds ->
+        repository.allOverflows(bounds)
+    }
+
+    init {
+        scope.launch {
+            debouncedFetcher.results.collect { results ->
+                if (results != null) {
+                    val currentState = _state.value
+                    val location = when (currentState) {
+                        is UiState.Loaded -> currentState.location
+                        else -> locationProvider.currentLocation() ?: return@collect
+                    }
+                    _state.value = UiState.Loaded(
+                        overflows = results,
+                        location = location
+                    )
+                }
+            }
+        }
+    }
+
     fun selectOverflow(overflow: OverflowPoint) {
         _selectedOverflow.value = overflow
     }
@@ -43,11 +75,19 @@ class OverflowViewModel(
         _selectedOverflow.value = null
     }
 
+    fun onViewportChanged(bounds: BoundingBox) {
+        currentViewportBounds = bounds
+        if (!initialLoadComplete) return
+        _hasUserInteracted.value = true
+        debouncedFetcher.onViewportChanged(bounds)
+    }
+
     fun refresh() {
+        debouncedFetcher.cancel()
         scope.launch {
             val currentState = _state.value
             if (currentState is UiState.Loaded) {
-                _state.update { currentState.copy(isRefreshing = true) }
+                _state.value = currentState.copy(isRefreshing = true)
             } else {
                 _state.value = UiState.Loading
             }
@@ -59,12 +99,20 @@ class OverflowViewModel(
                     return@launch
                 }
 
-                val allOverflows = repository.allOverflows(location)
-                val nearby = allOverflows.nearbyOverflows(location)
+                val bounds = currentViewportBounds ?: location.toBoundingBox()
+                val allOverflows = repository.allOverflows(bounds)
+
+                val overflows = if (_hasUserInteracted.value) {
+                    allOverflows
+                } else {
+                    allOverflows.nearbyOverflows(location)
+                }
+
                 _state.value = UiState.Loaded(
-                    overflows = nearby,
+                    overflows = overflows,
                     location = location
                 )
+                initialLoadComplete = true
             } catch (e: Exception) {
                 _state.value = UiState.Error(
                     message = e.message ?: "Failed to load overflow data"
