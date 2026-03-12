@@ -12,7 +12,9 @@ import com.chicot.turdalert.model.BoundingBox
 import com.chicot.turdalert.model.DischargeStatus
 import com.chicot.turdalert.model.OverflowPoint
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.ObjCAction
 import platform.CoreLocation.CLLocationCoordinate2DMake
+import platform.Foundation.NSSelectorFromString
 import platform.MapKit.MKAnnotationProtocol
 import platform.MapKit.MKAnnotationView
 import platform.MapKit.MKCoordinateRegionMake
@@ -21,6 +23,7 @@ import platform.MapKit.MKMapView
 import platform.MapKit.MKMapViewDelegateProtocol
 import platform.MapKit.MKPinAnnotationView
 import platform.MapKit.MKPointAnnotation
+import platform.UIKit.UITapGestureRecognizer
 import platform.darwin.NSObject
 
 @OptIn(ExperimentalForeignApi::class)
@@ -33,32 +36,20 @@ private class OverflowAnnotation(
     }
 }
 
-@OptIn(ExperimentalForeignApi::class)
-private class UserLocationAnnotation(
-    location: Coordinates
-) : MKPointAnnotation() {
-    init {
-        setCoordinate(CLLocationCoordinate2DMake(location.latitude, location.longitude))
-        setTitle("You are here")
-    }
-}
-
 private class MapDelegate(
     private val onMarkerClick: (OverflowPoint) -> Unit,
     private val onMapClick: () -> Unit
 ) : NSObject(), MKMapViewDelegateProtocol {
 
+    @ObjCAction
+    fun handleMapTap() {
+        onMapClick()
+    }
+
     override fun mapView(
         mapView: MKMapView,
         viewForAnnotation: MKAnnotationProtocol
     ): MKAnnotationView? {
-        if (viewForAnnotation is UserLocationAnnotation) {
-            val id = "user"
-            val view = mapView.dequeueReusableAnnotationViewWithIdentifier(id)
-                ?: MKAnnotationView(annotation = viewForAnnotation, reuseIdentifier = id)
-            view.annotation = viewForAnnotation
-            return view
-        }
         if (viewForAnnotation is OverflowAnnotation) {
             val id = "overflow"
             val view = mapView.dequeueReusableAnnotationViewWithIdentifier(id) as? MKPinAnnotationView
@@ -102,12 +93,16 @@ actual fun MapView(
         factory = {
             MKMapView().apply {
                 this.delegate = delegate
+                showsUserLocation = true
+                val tapGesture = UITapGestureRecognizer(
+                    target = delegate,
+                    action = NSSelectorFromString("handleMapTap")
+                )
+                addGestureRecognizer(tapGesture)
             }
         },
         update = { mapView ->
             mapView.removeAnnotations(mapView.annotations)
-
-            mapView.addAnnotation(UserLocationAnnotation(userLocation))
 
             overflows.forEach { overflow ->
                 mapView.addAnnotation(OverflowAnnotation(overflow))
