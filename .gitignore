@@ -15,6 +15,11 @@ build/
 
 # Kotlin
 *.class
+.kotlin/
+
+# Tooling artefacts
+.superpowers/
+.serena/
 
 # Android
 local.properties

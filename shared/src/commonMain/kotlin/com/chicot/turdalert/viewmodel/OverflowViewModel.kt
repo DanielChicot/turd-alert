@@ -1,7 +1,7 @@
 package com.chicot.turdalert.viewmodel
 
 import com.chicot.turdalert.api.OverflowRepository
-import com.chicot.turdalert.domain.withinRadius
+import com.chicot.turdalert.domain.nearbyOverflows
 import com.chicot.turdalert.location.Coordinates
 import com.chicot.turdalert.location.LocationProvider
 import com.chicot.turdalert.model.OverflowPoint
@@ -32,6 +32,17 @@ class OverflowViewModel(
     private val _state = MutableStateFlow<UiState>(UiState.Loading)
     val state: StateFlow<UiState> = _state.asStateFlow()
 
+    private val _selectedOverflow = MutableStateFlow<OverflowPoint?>(null)
+    val selectedOverflow: StateFlow<OverflowPoint?> = _selectedOverflow.asStateFlow()
+
+    fun selectOverflow(overflow: OverflowPoint) {
+        _selectedOverflow.value = overflow
+    }
+
+    fun clearSelection() {
+        _selectedOverflow.value = null
+    }
+
     fun refresh() {
         scope.launch {
             val currentState = _state.value
@@ -49,7 +60,7 @@ class OverflowViewModel(
                 }
 
                 val allOverflows = repository.allOverflows(location)
-                val nearby = allOverflows.withinRadius(location)
+                val nearby = allOverflows.nearbyOverflows(location)
                 _state.value = UiState.Loaded(
                     overflows = nearby,
                     location = location

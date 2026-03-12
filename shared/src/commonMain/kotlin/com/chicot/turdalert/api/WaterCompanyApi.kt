@@ -9,7 +9,7 @@ import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 
-private const val SEARCH_RADIUS_MILES = 2.0
+private const val SEARCH_RADIUS_MILES = 5.0
 private const val DEGREES_PER_MILE_LAT = 1.0 / 69.0
 private const val DEGREES_PER_MILE_LON_AT_55 = 1.0 / 39.0
 
