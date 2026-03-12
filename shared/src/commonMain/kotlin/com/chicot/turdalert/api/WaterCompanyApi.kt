@@ -1,31 +1,20 @@
 package com.chicot.turdalert.api
 
-import com.chicot.turdalert.location.Coordinates
+import com.chicot.turdalert.model.BoundingBox
 import com.chicot.turdalert.model.DischargeStatus
 import com.chicot.turdalert.model.OverflowPoint
-import com.chicot.turdalert.util.distanceMiles
+import com.chicot.turdalert.model.overlaps
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 
-private const val SEARCH_RADIUS_MILES = 5.0
-private const val DEGREES_PER_MILE_LAT = 1.0 / 69.0
-private const val DEGREES_PER_MILE_LON_AT_55 = 1.0 / 39.0
-
-private fun boundingBox(centre: Coordinates, radiusMiles: Double = SEARCH_RADIUS_MILES): String {
-    val dLat = radiusMiles * DEGREES_PER_MILE_LAT
-    val dLon = radiusMiles * DEGREES_PER_MILE_LON_AT_55
-    val xMin = centre.longitude - dLon
-    val yMin = centre.latitude - dLat
-    val xMax = centre.longitude + dLon
-    val yMax = centre.latitude + dLat
-    return "$xMin,$yMin,$xMax,$yMax"
-}
+private fun BoundingBox.toArcGisGeometry(): String =
+    "$minLon,$minLat,$maxLon,$maxLat"
 
 internal sealed interface WaterCompanyApi {
     val companyName: String
-    suspend fun fetchOverflows(client: HttpClient, location: Coordinates): List<OverflowPoint>
+    suspend fun fetchOverflows(client: HttpClient, bounds: BoundingBox): List<OverflowPoint>
 }
 
 internal data class ArcGisCompany(
@@ -36,15 +25,15 @@ internal data class ArcGisCompany(
     val isSouthWestWater: Boolean = false
 ) : WaterCompanyApi {
 
-    override suspend fun fetchOverflows(client: HttpClient, location: Coordinates): List<OverflowPoint> =
-        if (isSouthWestWater) fetchSouthWestWater(client, location) else fetchStandard(client, location)
+    override suspend fun fetchOverflows(client: HttpClient, bounds: BoundingBox): List<OverflowPoint> =
+        if (isSouthWestWater) fetchSouthWestWater(client, bounds) else fetchStandard(client, bounds)
 
-    private suspend fun fetchStandard(client: HttpClient, location: Coordinates): List<OverflowPoint> =
+    private suspend fun fetchStandard(client: HttpClient, bounds: BoundingBox): List<OverflowPoint> =
         paginateArcGis(limit) { offset ->
             client.get("$root$resource") {
                 parameter("outFields", "*")
                 parameter("where", "1=1")
-                parameter("geometry", boundingBox(location))
+                parameter("geometry", bounds.toArcGisGeometry())
                 parameter("geometryType", "esriGeometryEnvelope")
                 parameter("spatialRel", "esriSpatialRelIntersects")
                 parameter("inSR", "4326")
@@ -70,12 +59,12 @@ internal data class ArcGisCompany(
             )
         }
 
-    private suspend fun fetchSouthWestWater(client: HttpClient, location: Coordinates): List<OverflowPoint> =
+    private suspend fun fetchSouthWestWater(client: HttpClient, bounds: BoundingBox): List<OverflowPoint> =
         paginateArcGis(limit) { offset ->
             client.get("$root$resource") {
                 parameter("outFields", "*")
                 parameter("where", "1=1")
-                parameter("geometry", boundingBox(location))
+                parameter("geometry", bounds.toArcGisGeometry())
                 parameter("geometryType", "esriGeometryEnvelope")
                 parameter("spatialRel", "esriSpatialRelIntersects")
                 parameter("inSR", "4326")
@@ -112,12 +101,18 @@ internal data object ThamesWaterApi : WaterCompanyApi {
     private const val SERVICE_AREA_LON_MIN = -2.2
     private const val SERVICE_AREA_LON_MAX = 0.6
 
-    private fun inServiceArea(location: Coordinates): Boolean =
-        location.latitude in SERVICE_AREA_LAT_MIN..SERVICE_AREA_LAT_MAX &&
-            location.longitude in SERVICE_AREA_LON_MIN..SERVICE_AREA_LON_MAX
+    private val serviceArea = BoundingBox(
+        minLat = SERVICE_AREA_LAT_MIN,
+        maxLat = SERVICE_AREA_LAT_MAX,
+        minLon = SERVICE_AREA_LON_MIN,
+        maxLon = SERVICE_AREA_LON_MAX
+    )
 
-    override suspend fun fetchOverflows(client: HttpClient, location: Coordinates): List<OverflowPoint> {
-        if (!inServiceArea(location)) return emptyList()
+    private fun inServiceArea(bounds: BoundingBox): Boolean =
+        bounds.overlaps(serviceArea)
+
+    override suspend fun fetchOverflows(client: HttpClient, bounds: BoundingBox): List<OverflowPoint> {
+        if (!inServiceArea(bounds)) return emptyList()
         return paginate { offset ->
             client.get(BASE_URL) {
                 parameter("limit", PAGE_SIZE)
@@ -139,7 +134,8 @@ internal data object ThamesWaterApi : WaterCompanyApi {
                 company = companyName
             )
         }.filter { point ->
-            distanceMiles(location.latitude, location.longitude, point.latitude, point.longitude) <= SEARCH_RADIUS_MILES
+            point.latitude in bounds.minLat..bounds.maxLat &&
+                point.longitude in bounds.minLon..bounds.maxLon
         }
     }
 
@@ -162,11 +158,11 @@ internal data object WelshWaterApi : WaterCompanyApi {
     private const val URL =
         "https://services3.arcgis.com/KLNF7YxtENPLYVey/arcgis/rest/services/Spill_Prod/FeatureServer/0/query"
 
-    override suspend fun fetchOverflows(client: HttpClient, location: Coordinates): List<OverflowPoint> =
+    override suspend fun fetchOverflows(client: HttpClient, bounds: BoundingBox): List<OverflowPoint> =
         client.get(URL) {
             parameter("where", "1=1")
             parameter("outFields", "*")
-            parameter("geometry", boundingBox(location))
+            parameter("geometry", bounds.toArcGisGeometry())
             parameter("geometryType", "esriGeometryEnvelope")
             parameter("spatialRel", "esriSpatialRelIntersects")
             parameter("inSR", "4326")

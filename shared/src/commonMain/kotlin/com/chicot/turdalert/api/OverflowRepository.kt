@@ -1,6 +1,6 @@
 package com.chicot.turdalert.api
 
-import com.chicot.turdalert.location.Coordinates
+import com.chicot.turdalert.model.BoundingBox
 import com.chicot.turdalert.model.OverflowPoint
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.async
@@ -63,12 +63,12 @@ class OverflowRepository(private val client: HttpClient) {
         WelshWaterApi
     )
 
-    suspend fun allOverflows(location: Coordinates): List<OverflowPoint> =
+    suspend fun allOverflows(bounds: BoundingBox): List<OverflowPoint> =
         coroutineScope {
             apis.map { api ->
                 async {
                     try {
-                        api.fetchOverflows(client, location)
+                        api.fetchOverflows(client, bounds)
                     } catch (_: Exception) {
                         emptyList()
                     }
