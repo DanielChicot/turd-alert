@@ -15,19 +15,19 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.datetime)
     implementation(libs.logback)
+    implementation(libs.exposed.core)
+    implementation(libs.exposed.jdbc)
+    implementation(libs.exposed.java.time)
+    implementation(libs.hikari)
+    implementation(libs.flyway.core)
+    implementation(libs.flyway.postgresql)
+    implementation(libs.postgresql)
 
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.testcontainers.postgresql)
     testImplementation(libs.testcontainers.junit)
-    testImplementation(libs.exposed.core)
-    testImplementation(libs.exposed.jdbc)
-    testImplementation(libs.exposed.java.time)
-    testImplementation(libs.hikari)
-    testImplementation(libs.flyway.core)
-    testImplementation(libs.flyway.postgresql)
-    testImplementation(libs.postgresql)
 }
 
 kotlin {
