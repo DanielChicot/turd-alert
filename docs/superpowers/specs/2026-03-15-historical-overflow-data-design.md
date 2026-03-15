@@ -17,14 +17,21 @@ turd-alert/
 ├── shared/        # existing KMP module (API clients, models, coordinate conversion)
 ├── composeApp/    # existing Compose Multiplatform UI
 ├── iosApp/        # existing iOS shell
-├── poller/        # NEW — scheduled polling + REST API server (JVM)
-├── server/        # NEW — Ktor REST API routes and request handling (JVM)
+├── backend/       # NEW — poller + REST API server (JVM), single entry point
 └── db/            # NEW — Postgres schema, migrations (Flyway), repository layer
 ```
 
+### Prerequisite: JVM Target for `shared` Module
+
+The `shared` module currently declares `androidTarget()` and iOS targets only. A `jvm()` target must be added so the backend can depend on it via `implementation(project(":shared"))`. This requires:
+
+- Adding `jvm()` to `shared/build.gradle.kts` KMP target list
+- A `jvmMain` source set providing a JVM Ktor engine (e.g. `ktor-client-cio`)
+- Verifying existing `commonMain` code compiles for JVM (expected to work — no platform-specific APIs in the API clients)
+
 ### Deployment
 
-Single JAR deployed on a Raspberry Pi. One process runs both the poller and the REST API server. Modules are separate in code for clean boundaries but packaged together for simple ops.
+Single JAR deployed on a Raspberry Pi. The `backend` module is the application entry point — it starts the Ktor server and launches the polling coroutine. The `db` module contains the schema, migrations, and repository layer. Both are packaged into one JAR for simple ops.
 
 Migration path: the same JAR runs on a VPS or container platform when the app gains users. No architectural changes required — just a different host and a managed Postgres instance.
 
@@ -67,17 +74,20 @@ Upserted on each poll cycle. If a water company adds, renames, or moves a site, 
 
 ```sql
 create table sites (
-    id          text primary key,
     company     text not null,
+    site_id     text not null,
     site_name   text,
     watercourse text,
     latitude    double precision not null,
-    longitude   double precision not null
+    longitude   double precision not null,
+
+    primary key (company, site_id)
 );
 
-create index idx_sites_company on sites (company);
 create index idx_sites_location on sites (latitude, longitude);
 ```
+
+Site IDs are scoped to their water company via a composite primary key. This prevents collisions if two companies issue the same permit number or ID.
 
 ### `readings` Table
 
@@ -85,21 +95,28 @@ Append-only, partitioned by month on `polled_at`. At ~14,187 sites x 96 polls/da
 
 ```sql
 create table readings (
-    site_id      text not null references sites(id),
+    company      text not null,
+    site_id      text not null,
     polled_at    timestamptz not null,
     status       smallint not null,   -- 1=discharging, 0=not discharging, -1=offline
     status_start timestamptz,
 
-    primary key (site_id, polled_at)
+    primary key (company, site_id, polled_at),
+    foreign key (company, site_id) references sites(company, site_id)
 ) partition by range (polled_at);
 ```
 
-Monthly partitions created by Flyway migration or a simple partition-management function:
+### Partition Management
+
+Monthly partitions are created automatically by a coroutine that runs once daily at startup and ensures partitions exist for the current month and the next 2 months ahead. This prevents insert failures at month boundaries.
 
 ```sql
+-- example generated partition
 create table readings_2026_03 partition of readings
     for values from ('2026-03-01') to ('2026-04-01');
 ```
+
+The partition-creation query is idempotent (`IF NOT EXISTS` semantics via checking `pg_catalog.pg_inherits`).
 
 ### Status Values
 
@@ -109,7 +126,7 @@ create table readings_2026_03 partition of readings
 | 0 | Not discharging | Normal operation |
 | -1 | Offline | Status unknown |
 
-`RECENT_DISCHARGE` is derived at query time (status = 0 and previous status = 1 within the last hour), not stored.
+`RECENT_DISCHARGE` is not stored. It is derived server-side when serving API responses, using the same logic as the existing app: a site has status `NOT_DISCHARGING` (0) and its `status_start` timestamp is within the last hour. This matches the current `RecentDischarge.kt` behaviour — no change in semantics when the app switches to the backend.
 
 ### Storage Estimates
 
@@ -232,6 +249,8 @@ Historical readings and statistics for a single site.
 
 Stats are computed server-side via SQL aggregation. The timeline contains raw readings for charting.
 
+**Timeline size limits:** `days` is capped at 90. For ranges > 7 days, the timeline is downsampled to one reading per hour (picking the "worst" status in each hour — discharging beats not-discharging beats offline). This keeps responses under ~2,200 entries for a 90-day request.
+
 ### `GET /api/v1/sites/worst-offenders`
 
 Top 20 sites ranked by total discharge hours within a radius and time period.
@@ -267,11 +286,30 @@ Top 20 sites ranked by total discharge hours within a radius and time period.
 
 Spatial filtering uses a bounding box pre-filter in SQL followed by Haversine distance check. PostGIS is not needed for this scale.
 
+### `GET /api/v1/health`
+
+Basic liveness and operational status.
+
+**Response:**
+
+```json
+{
+  "status": "ok",
+  "lastPollAt": "2026-03-15T14:15:00Z",
+  "lastPollDurationMs": 12340,
+  "companiesPolled": 10,
+  "companiesFailed": 0,
+  "databaseReachable": true,
+  "uptimeSeconds": 86400
+}
+```
+
 ### Shared Concerns
 
 - **No authentication** — the underlying data is public
 - **JSON serialisation** — kotlinx-serialization
 - **No rate limiting initially** — can add if needed
+- **Status mapping** — the database stores `smallint` (1/0/-1) but API responses return the `DischargeStatus` enum string (`DISCHARGING`, `RECENT_DISCHARGE`, `NOT_DISCHARGING`, `OFFLINE`). `RECENT_DISCHARGE` is derived server-side from `status_start` (see Status Values section). `statusStart` in the response is taken from the most recent reading's `status_start` field.
 
 ## App Integration
 
@@ -332,16 +370,31 @@ The core map experience is never blocked by backend availability. History fetche
 
 ## Deployment (Raspberry Pi)
 
-- Single JAR built by Gradle (`./gradlew :poller:shadowJar` or similar)
+- Single JAR built by Gradle (`./gradlew :backend:shadowJar` or similar)
 - Managed by systemd unit file (auto-restart on failure, log to journal)
 - Postgres installed via `apt install postgresql`
 - Data directory on SSD (not SD card) for write endurance
-- `shared_buffers = 128MB` for a 4GB Pi
+
+### Postgres Tuning (Pi)
+
+```
+shared_buffers = 128MB
+max_wal_size = 1GB
+checkpoint_completion_target = 0.9
+wal_buffers = 16MB
+synchronous_commit = off
+```
+
+`synchronous_commit = off` is acceptable here — in a crash, we lose at most the last few hundred milliseconds of writes. Since we accept data gaps from downtime anyway, this is a worthwhile trade for reduced I/O pressure on the SSD.
+
+### Backup
+
+Daily `pg_dump` via cron, compressed and copied to a remote location (e.g. `rsync` to a NAS, or upload to object storage). At ~20-30 GB/year uncompressed, compressed dumps are manageable. A daily backup is sufficient — the worst case is re-polling one day of data, which is acceptable.
 
 ## Future Considerations
 
 - **Migration to hosted:** Same JAR on a VPS, swap Postgres connection string to managed instance
 - **PostGIS:** Add if spatial queries become more complex (e.g. downstream impact analysis)
-- **Partition management:** Automate monthly partition creation (pg_partman or a simple scheduled SQL function)
+- **Worst-offenders query optimisation:** If the join across many site IDs and large reading partitions becomes slow, consider a materialised view or daily summary table. Not expected to be needed at initial scale.
 - **Data retention:** Drop/archive partitions older than N years if storage becomes a concern
 - **Push notifications (Phase B):** The poller already detects status changes — adding FCM/APNs dispatch is a natural extension
