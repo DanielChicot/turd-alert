@@ -213,12 +213,14 @@ Current status for all sites within a bounding box. Replaces the app's direct AP
 ]
 ```
 
-### `GET /api/v1/sites/{id}/history`
+### `GET /api/v1/sites/{company}/{siteId}/history`
 
-Historical readings and statistics for a single site.
+Historical readings and statistics for a single site, identified by its composite key.
 
 **Parameters:**
-- `days` (optional, default 30) — number of days of history
+- `company` (path, required) — water company identifier (e.g. `THAMES`, `SOUTHERN`)
+- `siteId` (path, required) — site identifier within that company
+- `days` (query, optional, default 30) — number of days of history
 
 **Response:**
 
