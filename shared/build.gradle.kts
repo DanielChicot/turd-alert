@@ -13,6 +13,8 @@ kotlin {
         }
     }
 
+    jvm()
+
     iosX64()
     iosArm64()
     iosSimulatorArm64()
@@ -35,6 +37,10 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.ktor.client.cio)
             implementation(libs.kotlinx.coroutines.android)
+        }
+
+        jvmMain.dependencies {
+            implementation(libs.ktor.client.cio)
         }
 
         iosMain.dependencies {
