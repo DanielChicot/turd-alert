@@ -31,15 +31,15 @@ The `shared` module currently declares `androidTarget()` and iOS targets only. A
 
 ### Deployment
 
-Single JAR deployed on a Raspberry Pi. The `backend` module is the application entry point — it starts the Ktor server and launches the polling coroutine. The `db` module contains the schema, migrations, and repository layer. Both are packaged into one JAR for simple ops.
+Deployed as two Docker containers on a Synology NAS via Docker Compose: one for the backend JAR (poller + REST API), one for Postgres. The `backend` module is the application entry point — it starts the Ktor server and launches the polling coroutine. The `db` module contains the schema, migrations, and repository layer.
 
-Migration path: the same JAR runs on a VPS or container platform when the app gains users. No architectural changes required — just a different host and a managed Postgres instance.
+Migration path: the same `docker-compose.yml` runs on any Docker host (VPS, cloud VM). For managed Postgres, remove the Postgres container and update the connection string.
 
 ### System Diagram
 
 ```mermaid
 graph LR
-    subgraph "Raspberry Pi"
+    subgraph "Synology NAS (Docker)"
         Poller[Poller<br/>15-min coroutine loop]
         API[REST API<br/>Ktor server]
         PG[(Postgres)]
@@ -362,7 +362,8 @@ The core map experience is never blocked by backend availability. History fetche
 |-----------|-----------|-----------|
 | Poller runtime | Kotlin/JVM | Reuses shared module API clients |
 | HTTP server | Ktor | Already used in shared module, lightweight |
-| Database | Postgres | Runs on Pi and hosted, relational, mature |
+| Containerisation | Docker Compose | Reproducible deployment, same locally and on NAS/hosted |
+| Database | Postgres | Runs anywhere Docker runs, relational, mature |
 | Migrations | Flyway | Standard, works with Gradle |
 | DB access | Exposed (JetBrains) | Idiomatic Kotlin, lightweight |
 | Connection pool | HikariCP | Industry standard, low overhead |
@@ -370,14 +371,63 @@ The core map experience is never blocked by backend availability. History fetche
 | Logging | SLF4J + Logback | Standard JVM logging |
 | Serialisation | kotlinx-serialization | Already used throughout the project |
 
-## Deployment (Raspberry Pi)
+## Deployment
 
-- Single JAR built by Gradle (`./gradlew :backend:shadowJar` or similar)
-- Managed by systemd unit file (auto-restart on failure, log to journal)
-- Postgres installed via `apt install postgresql`
-- Data directory on SSD (not SD card) for write endurance
+### Target: Synology NAS via Docker Compose
 
-### Postgres Tuning (Pi)
+The backend runs as two containers on a Synology NAS using Container Manager (Docker):
+
+```yaml
+# docker-compose.yml
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: turdalert
+      POSTGRES_USER: turdalert
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  backend:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/turdalert
+      DATABASE_USER: turdalert
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres-data:
+```
+
+**Dockerfile** for the backend:
+
+```dockerfile
+FROM eclipse-temurin:21-jre-alpine
+COPY backend/build/libs/backend-all.jar /app/backend.jar
+ENTRYPOINT ["java", "-Xmx256m", "-jar", "/app/backend.jar"]
+```
+
+### Deployment Workflow
+
+1. Build locally: `./gradlew :backend:shadowJar`
+2. Build Docker image: `docker build -t turd-alert-backend .`
+3. Copy `docker-compose.yml` and image to NAS (via `docker save`/`docker load` or a local registry)
+4. On the NAS: `docker compose up -d`
+
+Container Manager's web UI provides logs, restart controls, and resource monitoring.
+
+### Postgres Tuning
+
+Applied via a custom `postgresql.conf` mounted into the container, or via `command` args in compose:
 
 ```
 shared_buffers = 128MB
@@ -387,15 +437,18 @@ wal_buffers = 16MB
 synchronous_commit = off
 ```
 
-`synchronous_commit = off` is acceptable here — in a crash, we lose at most the last few hundred milliseconds of writes. Since we accept data gaps from downtime anyway, this is a worthwhile trade for reduced I/O pressure on the SSD.
+`synchronous_commit = off` is acceptable — in a crash, we lose at most the last few hundred milliseconds of writes. Since we accept data gaps from downtime anyway, this is a worthwhile trade for reduced write pressure.
 
 ### Backup
 
-Daily `pg_dump` via cron, compressed and copied to a remote location (e.g. `rsync` to a NAS, or upload to object storage). At ~20-30 GB/year uncompressed, compressed dumps are manageable. A daily backup is sufficient — the worst case is re-polling one day of data, which is acceptable.
+Daily `pg_dump` via a scheduled task in DSM (Task Scheduler), writing compressed dumps to a separate shared folder on the NAS. The NAS's own backup tools (Hyper Backup) can then replicate these offsite. At ~20-30 GB/year uncompressed, this is well within NAS storage capacity.
+
+### Migration to Hosted
+
+The same `docker-compose.yml` runs on any Docker host (VPS, cloud VM). For managed Postgres (e.g. RDS, Neon), remove the `postgres` service and update `DATABASE_URL` to point at the managed instance.
 
 ## Future Considerations
 
-- **Migration to hosted:** Same JAR on a VPS, swap Postgres connection string to managed instance
 - **PostGIS:** Add if spatial queries become more complex (e.g. downstream impact analysis)
 - **Worst-offenders query optimisation:** If the join across many site IDs and large reading partitions becomes slow, consider a materialised view or daily summary table. Not expected to be needed at initial scale.
 - **Data retention:** Drop/archive partitions older than N years if storage becomes a concern
