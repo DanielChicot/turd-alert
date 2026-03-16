@@ -40,6 +40,7 @@ tasks.test {
 
 tasks.shadowJar {
     archiveClassifier.set("all")
+    mergeServiceFiles()
     manifest {
         attributes("Main-Class" to "com.chicot.turdalert.backend.ApplicationKt")
     }

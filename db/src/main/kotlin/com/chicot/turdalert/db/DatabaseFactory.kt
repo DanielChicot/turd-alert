@@ -30,9 +30,11 @@ private fun hikariDataSource(config: DatabaseConfig): HikariDataSource =
     })
 
 private fun migrate(dataSource: DataSource) {
-    Flyway.configure()
+    Flyway.configure(DatabaseConfig::class.java.classLoader)
         .dataSource(dataSource)
         .locations("classpath:db/migration")
+        .failOnMissingLocations(true)
+        .validateMigrationNaming(true)
         .load()
         .migrate()
 }
