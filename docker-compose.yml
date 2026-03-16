@@ -22,9 +22,10 @@ services:
       - "synchronous_commit=off"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U turdalert"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
   backend:
     build: .
