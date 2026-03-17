@@ -15,6 +15,7 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.cio.CIO
 import io.ktor.server.engine.embeddedServer
+import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.launch
@@ -38,6 +39,7 @@ fun main() {
     val poller = Poller(overflowRepository, siteRepository, readingRepository, partitionManager, database)
 
     embeddedServer(CIO, port = 8080) {
+        install(CallLogging)
         install(ContentNegotiation) {
             json(Json { prettyPrint = false })
         }
