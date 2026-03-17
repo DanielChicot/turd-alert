@@ -18,7 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.chicot.turdalert.api.createOverflowRepository
+import com.chicot.turdalert.api.createHybridOverflowRepository
 import com.chicot.turdalert.location.LocationProvider
 import com.chicot.turdalert.map.MapView
 import com.chicot.turdalert.map.openDirections
@@ -35,7 +35,7 @@ import kotlinx.datetime.Clock
 @Composable
 fun App(locationProvider: LocationProvider) {
     val viewModel = remember {
-        val repository = createOverflowRepository()
+        val repository = createHybridOverflowRepository("http://100.83.26.78:8080")
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         OverflowViewModel(repository, locationProvider, scope)
     }

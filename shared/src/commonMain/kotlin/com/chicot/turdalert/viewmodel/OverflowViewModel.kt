@@ -1,6 +1,6 @@
 package com.chicot.turdalert.viewmodel
 
-import com.chicot.turdalert.api.OverflowRepository
+import com.chicot.turdalert.api.OverflowFetcher
 import com.chicot.turdalert.domain.DebouncedFetcher
 import com.chicot.turdalert.domain.nearbyOverflows
 import com.chicot.turdalert.domain.withRecentDischargeStatus
@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 
 class OverflowViewModel(
-    private val repository: OverflowRepository,
+    private val repository: OverflowFetcher,
     private val locationProvider: LocationProvider,
     private val scope: CoroutineScope
 ) {

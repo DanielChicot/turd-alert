@@ -22,5 +22,11 @@ internal object HttpClientFactory {
     }
 }
 
-fun createOverflowRepository(): OverflowRepository =
+fun createOverflowRepository(): OverflowFetcher =
     OverflowRepository(HttpClientFactory.create())
+
+fun createHybridOverflowRepository(backendUrl: String): OverflowFetcher {
+    val client = HttpClientFactory.create()
+    val direct = OverflowRepository(client)
+    return HybridOverflowRepository(backendUrl, client, direct)
+}

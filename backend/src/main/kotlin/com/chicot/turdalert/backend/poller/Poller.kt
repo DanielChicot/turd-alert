@@ -1,6 +1,6 @@
 package com.chicot.turdalert.backend.poller
 
-import com.chicot.turdalert.api.OverflowRepository
+import com.chicot.turdalert.api.OverflowFetcher
 import com.chicot.turdalert.db.partition.PartitionManager
 import com.chicot.turdalert.db.repository.ReadingRepository
 import com.chicot.turdalert.db.repository.ReadingRow
@@ -47,7 +47,7 @@ fun OverflowPoint.toReadingRow(polledAt: OffsetDateTime): ReadingRow = ReadingRo
 )
 
 class Poller(
-    private val overflowRepository: OverflowRepository,
+    private val overflowRepository: OverflowFetcher,
     private val siteRepository: SiteRepository,
     private val readingRepository: ReadingRepository,
     private val partitionManager: PartitionManager,

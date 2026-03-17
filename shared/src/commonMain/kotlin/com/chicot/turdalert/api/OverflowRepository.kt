@@ -7,7 +7,11 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 
-class OverflowRepository(private val client: HttpClient) {
+interface OverflowFetcher {
+    suspend fun allOverflows(bounds: BoundingBox): List<OverflowPoint>
+}
+
+class OverflowRepository(private val client: HttpClient) : OverflowFetcher {
 
     private val apis: List<WaterCompanyApi> = listOf(
         ArcGisCompany(
@@ -63,7 +67,7 @@ class OverflowRepository(private val client: HttpClient) {
         WelshWaterApi
     )
 
-    suspend fun allOverflows(bounds: BoundingBox): List<OverflowPoint> =
+    override suspend fun allOverflows(bounds: BoundingBox): List<OverflowPoint> =
         coroutineScope {
             apis.map { api ->
                 async {
