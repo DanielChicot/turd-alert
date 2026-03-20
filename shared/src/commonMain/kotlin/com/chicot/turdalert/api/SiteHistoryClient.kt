@@ -4,6 +4,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
+import io.ktor.http.encodeURLPathPart
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -44,7 +45,7 @@ class SiteHistoryClient(
 ) {
     suspend fun siteHistory(company: String, siteId: String, days: Int = 30): SiteHistoryResponse? =
         try {
-            client.get("$backendUrl/api/v1/sites/$company/$siteId/history") {
+            client.get("$backendUrl/api/v1/sites/${company.encodeURLPathPart()}/${siteId.encodeURLPathPart()}/history") {
                 parameter("days", days)
             }.body()
         } catch (_: Exception) {
