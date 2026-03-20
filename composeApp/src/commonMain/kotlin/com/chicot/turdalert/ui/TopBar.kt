@@ -35,6 +35,7 @@ private val DischargeRed = Color(0xFFFF1744)
 fun TopBar(
     overflows: List<OverflowPoint>,
     onRefreshClick: () -> Unit,
+    onWorstOffendersClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val discharging = overflows.count { it.status == DischargeStatus.DISCHARGING }
@@ -66,15 +67,25 @@ fun TopBar(
             )
         }
 
-        Text(
-            text = "\u21BB",
-            fontSize = 22.sp,
-            color = Color.White,
-            modifier = Modifier
-                .clip(CircleShape)
-                .clickable(onClick = onRefreshClick)
-                .padding(8.dp)
-        )
+        Row {
+            Text(
+                text = "\uD83D\uDCC3",
+                fontSize = 18.sp,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .clickable(onClick = onWorstOffendersClick)
+                    .padding(8.dp)
+            )
+            Text(
+                text = "\u21BB",
+                fontSize = 22.sp,
+                color = Color.White,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .clickable(onClick = onRefreshClick)
+                    .padding(8.dp)
+            )
+        }
     }
 }
 

@@ -12,14 +12,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.chicot.turdalert.api.WorstOffenderResult
 import com.chicot.turdalert.api.createHybridOverflowRepository
 import com.chicot.turdalert.api.createSiteHistoryClient
+import com.chicot.turdalert.api.createWorstOffendersClient
 import com.chicot.turdalert.location.LocationProvider
 import com.chicot.turdalert.map.MapView
 import com.chicot.turdalert.map.openDirections
@@ -27,15 +32,18 @@ import com.chicot.turdalert.model.cameraBounds
 import com.chicot.turdalert.ui.OverflowInfoCard
 import com.chicot.turdalert.ui.SplashOverlay
 import com.chicot.turdalert.ui.TopBar
+import com.chicot.turdalert.ui.WorstOffendersSheet
 import com.chicot.turdalert.viewmodel.OverflowViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 
 @Composable
 fun App(locationProvider: LocationProvider) {
     val backendUrl = "http://100.83.26.78:8080"
+    val worstOffendersClient = remember { createWorstOffendersClient(backendUrl) }
     val viewModel = remember {
         val repository = createHybridOverflowRepository(backendUrl)
         val historyClient = createSiteHistoryClient(backendUrl)
@@ -47,6 +55,10 @@ fun App(locationProvider: LocationProvider) {
     val selectedOverflow by viewModel.selectedOverflow.collectAsState()
     val selectedSiteStats by viewModel.selectedSiteStats.collectAsState()
     val hasUserInteracted by viewModel.hasUserInteracted.collectAsState()
+
+    val appScope = rememberCoroutineScope()
+    var showWorstOffenders by remember { mutableStateOf(false) }
+    var worstOffenders by remember { mutableStateOf<List<WorstOffenderResult>?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.refresh()
@@ -82,6 +94,18 @@ fun App(locationProvider: LocationProvider) {
                     TopBar(
                         overflows = state.overflows,
                         onRefreshClick = { viewModel.refresh() },
+                        onWorstOffendersClick = {
+                            showWorstOffenders = true
+                            worstOffenders = null
+                            appScope.launch {
+                                val location = locationProvider.currentLocation()
+                                if (location != null) {
+                                    worstOffenders = worstOffendersClient.worstOffenders(
+                                        location.latitude, location.longitude
+                                    )
+                                }
+                            }
+                        },
                         modifier = Modifier.align(Alignment.TopCenter)
                     )
 
@@ -145,6 +169,15 @@ fun App(locationProvider: LocationProvider) {
                 }
             }
         }
+            if (showWorstOffenders) {
+                WorstOffendersSheet(
+                    offenders = worstOffenders,
+                    onSiteClick = { offender ->
+                        showWorstOffenders = false
+                    },
+                    onClose = { showWorstOffenders = false }
+                )
+            }
             SplashOverlay()
         }
     }

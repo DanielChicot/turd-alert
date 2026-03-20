@@ -33,3 +33,6 @@ fun createHybridOverflowRepository(backendUrl: String): OverflowFetcher {
 
 fun createSiteHistoryClient(backendUrl: String): SiteHistoryClient =
     SiteHistoryClient(backendUrl, HttpClientFactory.create())
+
+fun createWorstOffendersClient(backendUrl: String): WorstOffendersClient =
+    WorstOffendersClient(backendUrl, HttpClientFactory.create())
