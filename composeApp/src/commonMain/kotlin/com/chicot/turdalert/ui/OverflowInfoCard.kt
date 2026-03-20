@@ -18,10 +18,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.chicot.turdalert.api.SiteStatsResponse
 import com.chicot.turdalert.location.Coordinates
 import com.chicot.turdalert.model.DischargeStatus
 import com.chicot.turdalert.model.OverflowPoint
 import com.chicot.turdalert.util.distanceMiles
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.until
 
 private fun formatDuration(startMillis: Long, nowMillis: Long): String {
     val elapsedMinutes = ((nowMillis - startMillis) / 60_000).coerceAtLeast(0)
@@ -38,11 +43,27 @@ private fun formatDistance(miles: Double): String = when {
     else -> "${kotlin.math.round(miles * 10) / 10} mi"
 }
 
+private fun formatLastDischarge(lastDischargeAt: String?): String {
+    if (lastDischargeAt == null) return "No discharge recorded"
+    val then = Instant.parse(lastDischargeAt)
+    val now = Clock.System.now()
+    val duration = then.until(now, kotlinx.datetime.DateTimeUnit.MINUTE, TimeZone.UTC)
+    val hours = duration / 60
+    val days = hours / 24
+    return when {
+        duration < 60 -> "Last discharge: ${duration}m ago"
+        hours < 24 -> "Last discharge: ${hours}h ago"
+        days == 1L -> "Last discharge: yesterday"
+        else -> "Last discharge: ${days}d ago"
+    }
+}
+
 @Composable
 fun OverflowInfoCard(
     overflow: OverflowPoint,
     userLocation: Coordinates,
     currentTimeMillis: Long,
+    siteStats: SiteStatsResponse? = null,
     onDirectionsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -82,6 +103,15 @@ fun OverflowInfoCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = Color(0xFFFF1744),
                     fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+
+            if (siteStats != null && overflow.status != DischargeStatus.DISCHARGING) {
+                Text(
+                    text = formatLastDischarge(siteStats.lastDischargeAt),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }

@@ -19,13 +19,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.chicot.turdalert.api.createHybridOverflowRepository
+import com.chicot.turdalert.api.createSiteHistoryClient
 import com.chicot.turdalert.location.LocationProvider
 import com.chicot.turdalert.map.MapView
 import com.chicot.turdalert.map.openDirections
 import com.chicot.turdalert.model.cameraBounds
 import com.chicot.turdalert.ui.OverflowInfoCard
-import com.chicot.turdalert.ui.RefreshFAB
-import com.chicot.turdalert.ui.SummaryChip
+import com.chicot.turdalert.ui.SplashOverlay
+import com.chicot.turdalert.ui.TopBar
 import com.chicot.turdalert.viewmodel.OverflowViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,14 +35,17 @@ import kotlinx.datetime.Clock
 
 @Composable
 fun App(locationProvider: LocationProvider) {
+    val backendUrl = "http://100.83.26.78:8080"
     val viewModel = remember {
-        val repository = createHybridOverflowRepository("http://100.83.26.78:8080")
+        val repository = createHybridOverflowRepository(backendUrl)
+        val historyClient = createSiteHistoryClient(backendUrl)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        OverflowViewModel(repository, locationProvider, scope)
+        OverflowViewModel(repository, locationProvider, scope, historyClient)
     }
 
     val uiState by viewModel.state.collectAsState()
     val selectedOverflow by viewModel.selectedOverflow.collectAsState()
+    val selectedSiteStats by viewModel.selectedSiteStats.collectAsState()
     val hasUserInteracted by viewModel.hasUserInteracted.collectAsState()
 
     LaunchedEffect(Unit) {
@@ -49,6 +53,7 @@ fun App(locationProvider: LocationProvider) {
     }
 
     MaterialTheme {
+        Box(modifier = Modifier.fillMaxSize()) {
         when (val state = uiState) {
             is OverflowViewModel.UiState.Loading -> {
                 Box(
@@ -74,18 +79,10 @@ fun App(locationProvider: LocationProvider) {
                         modifier = Modifier.fillMaxSize()
                     )
 
-                    RefreshFAB(
-                        onClick = { viewModel.refresh() },
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(16.dp)
-                    )
-
-                    SummaryChip(
+                    TopBar(
                         overflows = state.overflows,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(start = 16.dp, top = 48.dp)
+                        onRefreshClick = { viewModel.refresh() },
+                        modifier = Modifier.align(Alignment.TopCenter)
                     )
 
                     selectedOverflow?.let { overflow ->
@@ -93,6 +90,7 @@ fun App(locationProvider: LocationProvider) {
                             overflow = overflow,
                             userLocation = state.location,
                             currentTimeMillis = Clock.System.now().toEpochMilliseconds(),
+                            siteStats = selectedSiteStats,
                             onDirectionsClick = {
                                 openDirections(overflow.latitude, overflow.longitude)
                             },
@@ -146,6 +144,8 @@ fun App(locationProvider: LocationProvider) {
                     }
                 }
             }
+        }
+            SplashOverlay()
         }
     }
 }

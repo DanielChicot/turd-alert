@@ -30,3 +30,6 @@ fun createHybridOverflowRepository(backendUrl: String): OverflowFetcher {
     val direct = OverflowRepository(client)
     return HybridOverflowRepository(backendUrl, client, direct)
 }
+
+fun createSiteHistoryClient(backendUrl: String): SiteHistoryClient =
+    SiteHistoryClient(backendUrl, HttpClientFactory.create())

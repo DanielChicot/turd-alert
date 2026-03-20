@@ -1,6 +1,8 @@
 package com.chicot.turdalert.viewmodel
 
 import com.chicot.turdalert.api.OverflowFetcher
+import com.chicot.turdalert.api.SiteHistoryClient
+import com.chicot.turdalert.api.SiteStatsResponse
 import com.chicot.turdalert.domain.DebouncedFetcher
 import com.chicot.turdalert.domain.nearbyOverflows
 import com.chicot.turdalert.domain.withRecentDischargeStatus
@@ -19,7 +21,8 @@ import kotlinx.datetime.Clock
 class OverflowViewModel(
     private val repository: OverflowFetcher,
     private val locationProvider: LocationProvider,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val historyClient: SiteHistoryClient? = null
 ) {
 
     sealed interface UiState {
@@ -38,6 +41,9 @@ class OverflowViewModel(
 
     private val _selectedOverflow = MutableStateFlow<OverflowPoint?>(null)
     val selectedOverflow: StateFlow<OverflowPoint?> = _selectedOverflow.asStateFlow()
+
+    private val _selectedSiteStats = MutableStateFlow<SiteStatsResponse?>(null)
+    val selectedSiteStats: StateFlow<SiteStatsResponse?> = _selectedSiteStats.asStateFlow()
 
     private val _hasUserInteracted = MutableStateFlow(false)
     val hasUserInteracted: StateFlow<Boolean> = _hasUserInteracted.asStateFlow()
@@ -74,10 +80,16 @@ class OverflowViewModel(
 
     fun selectOverflow(overflow: OverflowPoint) {
         _selectedOverflow.value = overflow
+        _selectedSiteStats.value = null
+        scope.launch {
+            val history = historyClient?.siteHistory(overflow.company, overflow.id)
+            _selectedSiteStats.value = history?.stats
+        }
     }
 
     fun clearSelection() {
         _selectedOverflow.value = null
+        _selectedSiteStats.value = null
     }
 
     fun onViewportChanged(bounds: BoundingBox) {
