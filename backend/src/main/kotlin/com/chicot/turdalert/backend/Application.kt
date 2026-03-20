@@ -1,6 +1,7 @@
 package com.chicot.turdalert.backend
 
 import com.chicot.turdalert.api.createOverflowRepository
+import com.chicot.turdalert.backend.cache.NationalRankingCache
 import com.chicot.turdalert.backend.api.healthRoutes
 import com.chicot.turdalert.backend.api.historyRoutes
 import com.chicot.turdalert.backend.api.overflowRoutes
@@ -37,6 +38,7 @@ fun main() {
 
     val overflowRepository = createOverflowRepository()
     val poller = Poller(overflowRepository, siteRepository, readingRepository, partitionManager, database)
+    val nationalRankingCache = NationalRankingCache(readingRepository, database)
 
     embeddedServer(CIO, port = 8080) {
         install(CallLogging)
@@ -48,9 +50,10 @@ fun main() {
             healthRoutes(database, startTime) { poller }
             overflowRoutes(database, readingRepository)
             historyRoutes(database, siteRepository, readingRepository)
-            worstOffendersRoutes(database, siteRepository, readingRepository)
+            worstOffendersRoutes(database, siteRepository, readingRepository, nationalRankingCache)
         }
 
         launch { poller.runForever() }
+        launch { nationalRankingCache.refreshForever() }
     }.start(wait = true)
 }

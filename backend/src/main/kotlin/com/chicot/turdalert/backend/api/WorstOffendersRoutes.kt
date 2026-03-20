@@ -1,5 +1,6 @@
 package com.chicot.turdalert.backend.api
 
+import com.chicot.turdalert.backend.cache.NationalRankingCache
 import com.chicot.turdalert.db.repository.ReadingRepository
 import com.chicot.turdalert.db.repository.SiteRepository
 import com.chicot.turdalert.db.repository.SiteRow
@@ -24,40 +25,11 @@ private const val MAX_RESULTS = 20
 fun Route.worstOffendersRoutes(
     database: Database,
     siteRepository: SiteRepository,
-    readingRepository: ReadingRepository
+    readingRepository: ReadingRepository,
+    nationalRankingCache: NationalRankingCache
 ) {
     get("/api/v1/sites/worst-offenders/national") {
-        val days = (call.request.queryParameters["days"]?.toIntOrNull() ?: 30).coerceAtMost(90)
-        val limit = (call.request.queryParameters["limit"]?.toIntOrNull() ?: 10).coerceAtMost(50)
-        val now = OffsetDateTime.now(ZoneOffset.UTC)
-        val from = now.minusDays(days.toLong())
-
-        val results = transaction(database) {
-            readingRepository.topOffendersNational(from, limit).map { ranked ->
-                val totalHours = ranked.dischargingReadings * 15.0 / 60.0
-                val pct = if (ranked.totalReadings > 0)
-                    ranked.dischargingReadings.toDouble() / ranked.totalReadings * 100.0 else 0.0
-                WorstOffenderResponse(
-                    site = SiteResponse(
-                        id = ranked.siteId,
-                        siteName = ranked.siteName,
-                        watercourse = ranked.watercourse,
-                        company = ranked.company,
-                        latitude = ranked.latitude,
-                        longitude = ranked.longitude
-                    ),
-                    stats = StatsResponse(
-                        totalDischargeHours = totalHours,
-                        eventCount = 0,
-                        longestEventHours = 0.0,
-                        percentDischarging = pct,
-                        lastDischargeAt = ranked.lastDischargeAt?.toString()
-                    )
-                )
-            }
-        }
-
-        call.respond(results)
+        call.respond(nationalRankingCache.current())
     }
 
     get("/api/v1/sites/worst-offenders") {
