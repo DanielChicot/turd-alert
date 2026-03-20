@@ -84,8 +84,8 @@ fun App(locationProvider: LocationProvider) {
                     SummaryChip(
                         overflows = state.overflows,
                         modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 24.dp)
+                            .align(Alignment.TopStart)
+                            .padding(start = 16.dp, top = 48.dp)
                     )
 
                     selectedOverflow?.let { overflow ->
