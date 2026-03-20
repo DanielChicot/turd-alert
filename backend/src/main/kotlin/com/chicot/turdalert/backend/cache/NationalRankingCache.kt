@@ -13,7 +13,7 @@ import java.time.ZoneOffset
 import java.util.concurrent.atomic.AtomicReference
 
 private const val REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000L
-private const val DAYS = 30
+private const val DAYS = 7
 private const val LIMIT = 10
 
 class NationalRankingCache(
