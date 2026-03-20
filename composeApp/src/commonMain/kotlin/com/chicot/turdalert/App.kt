@@ -28,6 +28,7 @@ import com.chicot.turdalert.api.createWorstOffendersClient
 import com.chicot.turdalert.location.LocationProvider
 import com.chicot.turdalert.map.MapView
 import com.chicot.turdalert.map.openDirections
+import com.chicot.turdalert.model.BoundingBox
 import com.chicot.turdalert.model.cameraBounds
 import com.chicot.turdalert.ui.OverflowInfoCard
 import com.chicot.turdalert.ui.SplashOverlay
@@ -59,6 +60,7 @@ fun App(locationProvider: LocationProvider) {
     val appScope = rememberCoroutineScope()
     var showWorstOffenders by remember { mutableStateOf(false) }
     var worstOffenders by remember { mutableStateOf<List<WorstOffenderResult>?>(null) }
+    var navigateToBounds by remember { mutableStateOf<BoundingBox?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.refresh()
@@ -77,8 +79,16 @@ fun App(locationProvider: LocationProvider) {
             }
 
             is OverflowViewModel.UiState.Loaded -> {
-                val bounds = if (hasUserInteracted) null
+                val bounds = navigateToBounds
+                    ?: if (hasUserInteracted) null
                     else cameraBounds(state.overflows, state.location)
+
+                if (navigateToBounds != null) {
+                    LaunchedEffect(navigateToBounds) {
+                        kotlinx.coroutines.delay(500)
+                        navigateToBounds = null
+                    }
+                }
 
                 Box(modifier = Modifier.fillMaxSize()) {
                     MapView(
@@ -174,6 +184,13 @@ fun App(locationProvider: LocationProvider) {
                     offenders = worstOffenders,
                     onSiteClick = { offender ->
                         showWorstOffenders = false
+                        val padding = 0.005
+                        navigateToBounds = BoundingBox(
+                            minLat = offender.site.latitude - padding,
+                            maxLat = offender.site.latitude + padding,
+                            minLon = offender.site.longitude - padding,
+                            maxLon = offender.site.longitude + padding
+                        )
                     },
                     onClose = { showWorstOffenders = false }
                 )
