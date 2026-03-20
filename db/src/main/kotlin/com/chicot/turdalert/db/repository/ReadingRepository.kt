@@ -120,6 +120,57 @@ class ReadingRepository {
                 )
             }
 
+    data class RankedSite(
+        val company: String,
+        val siteId: String,
+        val siteName: String?,
+        val watercourse: String?,
+        val latitude: Double,
+        val longitude: Double,
+        val dischargingReadings: Int,
+        val totalReadings: Int,
+        val lastDischargeAt: OffsetDateTime?
+    )
+
+    fun topOffendersNational(from: OffsetDateTime, limit: Int = 10): List<RankedSite> {
+        val sql = """
+            SELECT s.company, s.site_id, s.site_name, s.watercourse, s.latitude, s.longitude,
+                   count(*) FILTER (WHERE r.status > 0) AS discharging_readings,
+                   count(*) AS total_readings,
+                   max(r.polled_at) FILTER (WHERE r.status > 0) AS last_discharge_at
+            FROM readings r
+            JOIN sites s ON r.company = s.company AND r.site_id = s.site_id
+            WHERE r.polled_at >= ?
+            GROUP BY s.company, s.site_id, s.site_name, s.watercourse, s.latitude, s.longitude
+            HAVING count(*) FILTER (WHERE r.status > 0) > 0
+            ORDER BY discharging_readings DESC
+            LIMIT ?
+        """.trimIndent()
+
+        val conn = TransactionManager.current().connection.connection as java.sql.Connection
+        return conn.prepareStatement(sql).use { stmt ->
+            stmt.setObject(1, from)
+            stmt.setInt(2, limit)
+            stmt.executeQuery().use { rs ->
+                buildList {
+                    while (rs.next()) {
+                        add(RankedSite(
+                            company = rs.getString("company"),
+                            siteId = rs.getString("site_id"),
+                            siteName = rs.getString("site_name"),
+                            watercourse = rs.getString("watercourse"),
+                            latitude = rs.getDouble("latitude"),
+                            longitude = rs.getDouble("longitude"),
+                            dischargingReadings = rs.getInt("discharging_readings"),
+                            totalReadings = rs.getInt("total_readings"),
+                            lastDischargeAt = rs.getObject("last_discharge_at", OffsetDateTime::class.java)
+                        ))
+                    }
+                }
+            }
+        }
+    }
+
     fun siteStats(
         company: String, siteId: String, from: OffsetDateTime, to: OffsetDateTime
     ): SiteStats {

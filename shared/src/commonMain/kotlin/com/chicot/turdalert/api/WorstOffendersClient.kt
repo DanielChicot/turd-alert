@@ -32,4 +32,13 @@ class WorstOffendersClient(
         } catch (_: Exception) {
             emptyList()
         }
+
+    suspend fun nationalWorstOffenders(days: Int = 30): List<WorstOffenderResult> =
+        try {
+            client.get("$backendUrl/api/v1/sites/worst-offenders/national") {
+                parameter("days", days)
+            }.body()
+        } catch (_: Exception) {
+            emptyList()
+        }
 }

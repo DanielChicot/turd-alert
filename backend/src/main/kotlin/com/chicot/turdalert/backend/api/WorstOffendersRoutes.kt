@@ -26,6 +26,40 @@ fun Route.worstOffendersRoutes(
     siteRepository: SiteRepository,
     readingRepository: ReadingRepository
 ) {
+    get("/api/v1/sites/worst-offenders/national") {
+        val days = (call.request.queryParameters["days"]?.toIntOrNull() ?: 30).coerceAtMost(90)
+        val limit = (call.request.queryParameters["limit"]?.toIntOrNull() ?: 10).coerceAtMost(50)
+        val now = OffsetDateTime.now(ZoneOffset.UTC)
+        val from = now.minusDays(days.toLong())
+
+        val results = transaction(database) {
+            readingRepository.topOffendersNational(from, limit).map { ranked ->
+                val totalHours = ranked.dischargingReadings * 15.0 / 60.0
+                val pct = if (ranked.totalReadings > 0)
+                    ranked.dischargingReadings.toDouble() / ranked.totalReadings * 100.0 else 0.0
+                WorstOffenderResponse(
+                    site = SiteResponse(
+                        id = ranked.siteId,
+                        siteName = ranked.siteName,
+                        watercourse = ranked.watercourse,
+                        company = ranked.company,
+                        latitude = ranked.latitude,
+                        longitude = ranked.longitude
+                    ),
+                    stats = StatsResponse(
+                        totalDischargeHours = totalHours,
+                        eventCount = 0,
+                        longestEventHours = 0.0,
+                        percentDischarging = pct,
+                        lastDischargeAt = ranked.lastDischargeAt?.toString()
+                    )
+                )
+            }
+        }
+
+        call.respond(results)
+    }
+
     get("/api/v1/sites/worst-offenders") {
         val lat = call.request.queryParameters["lat"]?.toDoubleOrNull()
         val lon = call.request.queryParameters["lon"]?.toDoubleOrNull()

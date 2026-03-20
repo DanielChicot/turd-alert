@@ -60,6 +60,7 @@ fun App(locationProvider: LocationProvider) {
     val appScope = rememberCoroutineScope()
     var showWorstOffenders by remember { mutableStateOf(false) }
     var worstOffenders by remember { mutableStateOf<List<WorstOffenderResult>?>(null) }
+    var nationalOffenders by remember { mutableStateOf<List<WorstOffenderResult>?>(null) }
     var navigateToBounds by remember { mutableStateOf<BoundingBox?>(null) }
 
     LaunchedEffect(Unit) {
@@ -182,6 +183,14 @@ fun App(locationProvider: LocationProvider) {
             if (showWorstOffenders) {
                 WorstOffendersSheet(
                     offenders = worstOffenders,
+                    nationalOffenders = nationalOffenders,
+                    onTabChanged = { isNational ->
+                        if (isNational && nationalOffenders == null) {
+                            appScope.launch {
+                                nationalOffenders = worstOffendersClient.nationalWorstOffenders()
+                            }
+                        }
+                    },
                     onSiteClick = { offender ->
                         showWorstOffenders = false
                         val padding = 0.005
