@@ -43,6 +43,13 @@ private fun formatDistance(miles: Double): String = when {
     else -> "${kotlin.math.round(miles * 10) / 10} mi"
 }
 
+private fun formatStats(stats: SiteStatsResponse): String {
+    val hours = kotlin.math.round(stats.totalDischargeHours * 10) / 10
+    val events = stats.eventCount
+    val pct = kotlin.math.round(stats.percentDischarging * 10) / 10
+    return "${events} events · ${hours}h total · ${pct}% of time"
+}
+
 private fun formatLastDischarge(lastDischargeAt: String?): String {
     if (lastDischargeAt == null) return "No discharge recorded"
     val then = Instant.parse(lastDischargeAt)
@@ -113,6 +120,15 @@ fun OverflowInfoCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+
+            if (siteStats != null && siteStats.eventCount > 0) {
+                Text(
+                    text = formatStats(siteStats),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp)
                 )
             }
 
