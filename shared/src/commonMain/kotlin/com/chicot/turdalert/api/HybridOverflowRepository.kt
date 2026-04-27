@@ -5,6 +5,7 @@ import com.chicot.turdalert.model.DischargeStatus
 import com.chicot.turdalert.model.OverflowPoint
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import kotlinx.serialization.Serializable
@@ -36,6 +37,7 @@ class HybridOverflowRepository(
 
     private suspend fun fetchFromBackend(bounds: BoundingBox): List<OverflowPoint> =
         client.get("$backendUrl/api/v1/overflows") {
+            timeout { requestTimeoutMillis = 3_000 }
             parameter("minLat", bounds.minLat)
             parameter("maxLat", bounds.maxLat)
             parameter("minLon", bounds.minLon)

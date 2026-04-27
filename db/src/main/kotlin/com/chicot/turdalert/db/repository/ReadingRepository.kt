@@ -68,6 +68,7 @@ class ReadingRepository {
             JOIN readings r ON s.company = r.company AND s.site_id = r.site_id
             WHERE s.latitude >= ? AND s.latitude <= ?
               AND s.longitude >= ? AND s.longitude <= ?
+              AND r.polled_at >= now() - interval '6 hours'
             ORDER BY s.company, s.site_id, r.polled_at DESC
         """.trimIndent()
 
