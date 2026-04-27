@@ -1,6 +1,7 @@
 package com.chicot.turdalert.backend.api
 
 import com.chicot.turdalert.backend.TestApp
+import com.chicot.turdalert.backend.cache.NationalRankingCache
 import com.chicot.turdalert.db.repository.ReadingRow
 import com.chicot.turdalert.db.repository.SiteRow
 import com.chicot.turdalert.db.tables.SitesTable
@@ -34,9 +35,11 @@ class WorstOffendersRoutesTest {
     private val centerLat = 51.5
     private val centerLon = -0.1
 
+    private val nationalRankingCache = NationalRankingCache(readingRepo, database)
+
     private fun Application.configureTest() {
         install(ContentNegotiation) { json(Json { encodeDefaults = true }) }
-        routing { worstOffendersRoutes(database, siteRepo, readingRepo) }
+        routing { worstOffendersRoutes(database, siteRepo, readingRepo, nationalRankingCache) }
     }
 
     @BeforeTest
